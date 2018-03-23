@@ -1,38 +1,47 @@
-
-<% if @presenter.box_link_display_for_work? %>
-  <p><%= link_to t('simple_form.generic_work.box_link'), @presenter.box_link, class: 'btn btn-default', target: "_blank" %></p>
+<% if @presenter.box_enabled? && user_signed_in? %>
+  <% if !@presenter.current_ability.admin? && @presenter.file_set_presenters.present? && @presenter.box_link_display_for_work?( current_user ) %>
+    <p><%= link_to t('simple_form.generic_work.box_link'), @presenter.box_link, class: 'btn btn-default', target: "_blank" %></p>
+  <% end %>
+  <% if @presenter.current_ability.admin? && @presenter.box_link_display_for_work?( current_user ) %>
+    <p><%= link_to t('simple_form.generic_work.box_link'), @presenter.box_link, class: 'btn btn-default', target: "_blank" %></p>
+  <% end %>
 <% end %>
-
 <% if @presenter.file_set_presenters.present? %>
-<div class="panel panel-default related_files">
-  <div class="panel-heading">
-    <h2><%= @presenter.label_with_total_file_size( 'Files' ) %></h2>
+  <div class="panel panel-default related_files">
+    <div class="panel-heading">
+      <h2><%= @presenter.label_with_total_file_size( 'Files' ) %></h2>
+    </div>
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>File</th>
+          <th>Filename</th>
+          <th>Date Uploaded</th>
+          <th>File&nbsp;Size</th>
+          <th>Access</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      <%= render partial: 'member', collection: @presenter.member_presenters %>
+      </tbody>
+    </table>
   </div>
-  <table class="table table-striped">
-    <thead>
-      <tr>
-        <th>File</th>
-        <th>Filename</th>
-        <th>Date Uploaded</th>
-        <th>File&nbsp;Size</th>
-        <th>Access</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-    <%= render partial: 'member', collection: @presenter.member_presenters %>
-    </tbody>
-  </table>
-</div>
   <% if Hyrax.config.download_files %><!-- && @presenter.file_set_presenters.length > 1 -->
     <%= form_tag(main_app.download_hyrax_generic_work_path(@presenter.id), method: 'post') do %>
       <%= hidden_field_tag('generic_work[nop]') %>
       <% if Umrdr::Application.config.max_work_file_size_to_download < @presenter.total_file_size %>
-        <p><%= t('simple_form.generic_work.total_work_size_too_large_to_download') %></p>
+        <p><%= t('simple_form.generic_work.total_work_size_too_large_to_download',
+                 total_file_size: @presenter.total_file_size_human_readable ) %>
+          <%= render partial: '/contact_us' %>.
+        </p>
       <% else %>
         <%= submit_tag( @presenter.label_with_total_file_size( t('simple_form.actions.generic_work.download') ), class: 'btn btn-primary') %>
         <% if Umrdr::Application.config.min_work_file_size_to_download_warn < @presenter.total_file_size %>
-          <%= t('simple_form.generic_work.total_work_size_may_be_too_large_to_download') %>
+          <p><%= t('simple_form.generic_work.total_work_size_may_be_too_large_to_download',
+                total_file_size: @presenter.total_file_size_human_readable ) %>
+            <%= render partial: '/contact_us' %></a>
+          </p>
         <% end %>
       <% end %>
     <% end %>
@@ -41,15 +50,20 @@
       <%= hidden_field_tag('generic_work[nop]') %>
       <% if Umrdr::Application.config.globus_enabled %>
         <% if @presenter.globus_files_available? %>
-          <p><%= link_to t('simple_form.generic_work.globus_link'),
+          <p><%= t('simple_form.generic_work.globus_files_are_ready') %> &nbsp;
+            <%= link_to t('simple_form.generic_work.globus_link'),
                          @presenter.globus_external_url,
                          class: 'btn btn-default',
                          target: "_blank",
                          title: "link to external globus files" %>
+            <br/>
+            <%= t('simple_form.generic_work.globus_is_for_large_datasets') %> &nbsp;
             <a href="<%= main_app.static_path(action: 'globus-help')%>"><%= t('simple_form.generic_work.globus_help') %></a>
           </p>
         <% elsif !@presenter.globus_files_prepping? %>
           <%= submit_tag(t('simple_form.actions.generic_work.globus_download'), class: 'btn btn-primary') %>
+          <br/>
+          <%= t('simple_form.generic_work.globus_is_for_large_datasets') %> &nbsp;
           <a href="<%= main_app.static_path(action: 'globus-help')%>"><%= t('simple_form.generic_work.globus_help') %></a>
         <% end %>
       <% end %>
@@ -70,8 +84,11 @@
       <%= hidden_field_tag('generic_work[nop]') %>
       <% if Umrdr::Application.config.globus_enabled %>
         <% if @presenter.globus_files_prepping? %>
-          <%= t('simple_form.generic_work.globus_currently_downloading')
+          <%= t('simple_form.generic_work.globus_currently_downloading_html')
               submit_tag(t('simple_form.actions.generic_work.globus_download_add_email'), class: 'btn btn-primary') %>
+          <br/>
+          <%= t('simple_form.generic_work.globus_is_for_large_datasets') %> &nbsp;
+          <a href="<%= main_app.static_path(action: 'globus-help')%>"><%= t('simple_form.generic_work.globus_help') %></a>
         <% end %>
       <% end %>
       <p></p>
@@ -80,16 +97,16 @@
   <% end %>
 <% elsif can? :edit, @presenter.id %>
 
-<% if @presenter.tombstone.blank? %>
-  <div class="panel panel-default related_files">
-    <div class="panel-heading">
-      <h2>Files</h2>
+  <% if @presenter.tombstone.blank? %>
+    <div class="panel panel-default related_files">
+      <div class="panel-heading">
+        <h2>Files</h2>
+      </div>
+      <div class="alert alert-block alert-warning">
+        <p class="center"><%= t('.work_has_no_files', human_readable_type: @presenter.human_readable_type ) %></p>
+      </div>
     </div>
-    <div class="alert alert-block alert-warning">
-      <p class="center">This <%= @presenter.human_readable_type %> has no files associated with it.</p>
-    </div>
-  </div>
-<% end %>
+  <% end %>
 
 <% end %>
 

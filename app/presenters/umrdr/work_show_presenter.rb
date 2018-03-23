@@ -10,17 +10,22 @@ module Umrdr
       @solr_document.authoremail
     end
 
-    def box_link( only_if_exists_in_box: false )
-      concern_id = @solr_document.id
-      return ::BoxHelper.box.upload_link( concern_id ) unless only_if_exists_in_box
-      return ::BoxHelper.box.upload_link( concern_id ) if ::BoxHelper.box.directory_exists?( concern_id )
-      return nil
+    def box_enabled?
+      Umrdr::Application.config.box_integration_enabled
     end
 
-    def box_link_display_for_work?
+    def box_link( only_if_exists_in_box: false )
+      return nil unless box_enabled?
       concern_id = @solr_document.id
-      work_file_count = total_file_count
-      rv = ::BoxHelper.box_link_display_for_work?( work_id: concern_id, work_file_count: work_file_count )
+      return ::BoxHelper.box_link( concern_id, only_if_exists_in_box: only_if_exists_in_box )
+    end
+
+    def box_link_display_for_work?( current_user )
+      return false unless box_enabled?
+      rv = ::BoxHelper.box_link_display_for_work?( work_id: @solr_document.id,
+                                                   work_file_count: total_file_count,
+                                                   is_admin: current_ability.admin?,
+                                                   user_email: EmailHelper.user_email_from( current_user ) )
       return rv
     end
 
