@@ -99,4 +99,4 @@ end
 gem 'rsolr'
 gem 'devise'
 gem 'devise-guests'
-
+gem 'omniauth-cas'
